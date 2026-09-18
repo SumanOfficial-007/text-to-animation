@@ -1,92 +1,131 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="antialiased">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate 3D Particle Text Studio</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Particle Text Studio</title>
     
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: 'Inter', sans-serif;
-            color: white;
-            /* No background here, fully handled by Three.js to prevent whitesmoke bug */
-            background-color: transparent; 
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: '#0f0f15',
+                        panel: 'rgba(20, 20, 30, 0.75)',
+                    }
+                }
+            }
         }
+    </script>
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050505; /* Fallback */
+            touch-action: none; /* Prevent scroll on mobile */
+        }
+        
         #canvas-container {
             position: absolute;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            z-index: 0;
-            background: transparent;
-        }
-        #ui-panel {
-            position: absolute;
-            top: 1.5rem;
-            left: 1.5rem;
-            z-index: 10;
-            width: 340px;
-            max-width: calc(100vw - 3rem);
-            max-height: calc(100vh - 3rem);
-            overflow-y: auto;
-        }
-        
-        /* Hidden canvas for pixel extraction */
-        #hidden-canvas {
-            display: none;
+            z-index: 1;
         }
 
-        /* Custom Scrollbar for UI panel */
-        #ui-panel::-webkit-scrollbar {
-            width: 6px;
-        }
-        #ui-panel::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 4px;
-        }
-        #ui-panel::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: rgba(15, 15, 20, 0.65);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8);
         }
 
-        /* Custom slider styling */
+        /* Range Slider */
         input[type=range] {
             -webkit-appearance: none;
             width: 100%;
             background: transparent;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
         }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 16px;
-            width: 16px;
+            height: 14px;
+            width: 14px;
             border-radius: 50%;
-            background: #60a5fa;
+            background: #3b82f6;
             cursor: pointer;
-            margin-top: -6px;
-            box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+            margin-top: -5px;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+            transition: transform 0.1s;
         }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 2px;
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+        }
+
+        /* Color Picker */
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            padding: 0;
+            background: transparent;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 6px;
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.02);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+
+        /* Responsive Panel Transitions */
+        #ui-panel {
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
         }
         
-        /* Recording indicator animation */
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        /* Desktop */
+        @media (min-width: 768px) {
+            #ui-panel.hidden-state {
+                transform: translateX(-120%);
+                opacity: 0;
+                pointer-events: none;
+            }
         }
-        .recording {
-            animation: pulse-red 1.5s infinite;
-            background-color: #ef4444 !important;
-            border-color: #ef4444 !important;
+        
+        /* Mobile */
+        @media (max-width: 767px) {
+            #ui-panel.hidden-state {
+                transform: translateY(110%);
+                opacity: 0;
+                pointer-events: none;
+            }
         }
     </style>
 
@@ -99,107 +138,117 @@
         }
     </script>
 </head>
-<body>
+<body class="text-white">
 
     <div id="canvas-container"></div>
-    <canvas id="hidden-canvas" width="800" height="400"></canvas>
 
-    <div id="ui-panel" class="bg-black/40 backdrop-blur-2xl border border-white/10 p-6 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] transition-all">
-        <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 mb-6 flex items-center gap-2">
-            ✨ Pro Particles
-        </h1>
+    <!-- Toggle UI Button -->
+    <button id="toggle-ui" class="fixed top-4 left-4 md:top-6 md:left-6 z-30 w-12 h-12 glass-panel rounded-full flex items-center justify-center hover:bg-white/10 transition-colors shadow-lg border border-white/10 group">
+        <svg id="toggle-icon" class="w-5 h-5 text-gray-300 group-hover:text-white transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+    </button>
 
-        <div class="space-y-5">
+    <!-- Control Panel -->
+    <div id="ui-panel" class="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-24 md:left-6 md:right-auto md:w-[340px] glass-panel rounded-t-3xl md:rounded-2xl z-20 flex flex-col max-h-[85vh] md:max-h-[calc(100vh-8rem)]">
+        
+        <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+            <h1 class="text-lg font-black tracking-tight flex items-center gap-2 text-blue-400">
+                <span class="text-xl">✨</span> Pro Particles
+            </h1>
+            <!-- Mobile pull indicator -->
+            <div class="w-12 h-1 bg-white/20 rounded-full md:hidden absolute top-3 left-1/2 -translate-x-1/2"></div>
+        </div>
+
+        <div class="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+            
             <!-- Text Input -->
-            <div>
-                <label class="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Display Text</label>
-                <input type="text" id="text-input" value="STUDIO" 
-                       class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder-gray-500 font-bold tracking-widest">
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Display Text</label>
+                <input type="text" id="text-input" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors" value="suman">
             </div>
 
-            <!-- Font Selector -->
-            <div>
-                <label class="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Font Style</label>
-                <select id="font-select" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer [&>option]:bg-gray-900">
-                    <option value="Arial, sans-serif">Arial</option>
-                    <option value="'Impact', sans-serif">Impact</option>
-                    <option value="'Courier New', monospace">Courier New</option>
-                    <option value="'Times New Roman', serif">Times New Roman</option>
-                    <option value="'Comic Sans MS', cursive">Comic Sans</option>
+            <!-- Font Style -->
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Font Style</label>
+                <select id="font-select" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors appearance-none cursor-pointer">
+                    <option value="Arial">Arial</option>
+                    <option value="Impact">Impact</option>
+                    <option value="Inter">Inter</option>
+                    <option value="Times New Roman">Times New Roman</option>
                 </select>
             </div>
 
             <!-- Colors -->
             <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Text Color</label>
-                    <div class="flex items-center gap-2">
-                        <div class="relative w-8 h-8 rounded-full overflow-hidden border border-white/20">
-                            <input type="color" id="text-color" value="#60a5fa" class="absolute -top-2 -left-2 w-12 h-12 cursor-pointer">
-                        </div>
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Text Color</label>
+                    <div class="flex items-center gap-2 bg-black/40 p-1.5 rounded-lg border border-white/10">
+                        <input type="color" id="text-color" value="#3b82f6" class="w-6 h-6 rounded cursor-pointer">
+                        <span id="hex-text" class="text-[11px] font-mono text-gray-300">#3b82f6</span>
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Background</label>
-                    <div class="flex items-center gap-2">
-                        <div class="relative w-8 h-8 rounded-full overflow-hidden border border-white/20">
-                            <input type="color" id="bg-color" value="#0a0a16" class="absolute -top-2 -left-2 w-12 h-12 cursor-pointer">
-                        </div>
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Background</label>
+                    <div class="flex items-center gap-2 bg-black/40 p-1.5 rounded-lg border border-white/10">
+                        <input type="color" id="bg-color" value="#050508" class="w-6 h-6 rounded cursor-pointer">
+                        <span id="hex-bg" class="text-[11px] font-mono text-gray-300">#050508</span>
                     </div>
                 </div>
             </div>
 
             <!-- Sliders -->
-            <div>
-                <label class="flex justify-between text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
-                    <span>Particle Size</span>
-                    <span id="size-val">1.5</span>
-                </label>
-                <input type="range" id="size-slider" min="0.5" max="5.0" step="0.1" value="1.5">
+            <div class="space-y-4 pt-2">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Particle Size</label>
+                        <span id="val-size" class="text-[10px] text-gray-300 font-mono">0.9</span>
+                    </div>
+                    <input type="range" id="size-slider" min="0.5" max="3.0" step="0.1" value="0.9">
+                </div>
+                
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Repel Radius</label>
+                        <span id="val-radius" class="text-[10px] text-gray-300 font-mono">40</span>
+                    </div>
+                    <input type="range" id="radius-slider" min="10" max="100" step="1" value="40">
+                </div>
             </div>
 
-            <div>
-                <label class="flex justify-between text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
-                    <span>Repel Radius</span>
-                    <span id="repel-val">30</span>
-                </label>
-                <input type="range" id="repel-slider" min="0" max="100" step="1" value="30">
-            </div>
-            
-            <!-- Shape & Toggles -->
+            <!-- Toggles -->
             <div class="flex items-center justify-between pt-2">
-                <div>
-                    <label class="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Shape</label>
-                    <select id="shape-select" class="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-sm text-white focus:outline-none cursor-pointer [&>option]:bg-gray-900">
+                <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Shape</label>
+                    <select id="shape-select" class="bg-black/40 border border-white/10 rounded px-2 py-1 text-[11px] text-white focus:outline-none cursor-pointer">
                         <option value="circle">Circle</option>
                         <option value="square">Square</option>
                     </select>
                 </div>
                 
-                <div class="flex flex-col items-end">
-                    <label class="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Auto-Rotate</label>
+                <div class="flex flex-col items-end gap-1">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Auto-Rotate</label>
                     <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="auto-rotate" class="sr-only peer" checked>
-                        <div class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                        <input type="checkbox" id="auto-rotate" class="sr-only peer">
+                        <div class="w-8 h-4 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-500"></div>
                     </label>
                 </div>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="pt-4 space-y-3">
-                <button id="generate-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors shadow-lg">
+            <!-- Actions -->
+            <div class="pt-4 space-y-2">
+                <button id="btn-generate" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg font-bold transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] hover:shadow-[0_0_20px_rgba(37,99,235,0.6)]">
                     Generate Text
                 </button>
-                
-                <button id="scatter-btn" class="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-medium py-2.5 rounded-lg transition-colors">
+                <button id="btn-scatter" class="w-full py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm rounded-lg font-semibold transition-all">
                     Scatter Particles
                 </button>
-
-                <button id="record-btn" class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium py-2.5 rounded-lg transition-all shadow-lg">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                <button id="btn-record" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg font-bold transition-all flex items-center justify-center gap-2 group">
+                    <div class="w-2.5 h-2.5 bg-white rounded-full group-hover:scale-110 transition-transform"></div>
                     <span id="record-text">Start Recording</span>
                 </button>
             </div>
+            
         </div>
     </div>
 
@@ -207,383 +256,519 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // --- Core Variables ---
-        const container = document.getElementById('canvas-container');
+        // Main WebGL Variables
         let scene, camera, renderer, controls;
-        let particleSystem, particleGeometry, particleMaterial;
-        let targetPositions = [];
-        let originalPositions = [];
-        const clock = new THREE.Clock();
-
-        // UI Elements
-        const textInput = document.getElementById('text-input');
-        const fontSelect = document.getElementById('font-select');
-        const textColorInput = document.getElementById('text-color');
-        const bgColorInput = document.getElementById('bg-color');
-        const sizeSlider = document.getElementById('size-slider');
-        const repelSlider = document.getElementById('repel-slider');
-        const shapeSelect = document.getElementById('shape-select');
-        const autoRotateToggle = document.getElementById('auto-rotate');
+        let particles, geometry, material;
         
-        // Settings
-        let settings = {
-            text: textInput.value,
-            font: fontSelect.value,
-            textColor: textColorInput.value,
-            bgColor: bgColorInput.value,
-            particleSize: parseFloat(sizeSlider.value),
-            repelRadius: parseFloat(repelSlider.value),
-            shape: shapeSelect.value,
-            autoRotate: autoRotateToggle.checked,
-            density: 4 // Sample 1 particle every N pixels
-        };
-
-        // --- Textures ---
-        function createCircleTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64;
-            canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-            ctx.beginPath();
-            ctx.arc(32, 32, 28, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-            const texture = new THREE.CanvasTexture(canvas);
-            return texture;
-        }
-        const circleTexture = createCircleTexture();
-
-        // --- Initialization ---
-        function init() {
-            scene = new THREE.Scene();
-
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, 150);
-
-            // CRITICAL: preserveDrawingBuffer must be true for MediaRecorder to capture properly
-            // alpha: false ensures the clearColor is solidly rendered, fixing the whitesmoke bug
-            renderer = new THREE.WebGLRenderer({ 
-                antialias: true, 
-                preserveDrawingBuffer: true,
-                alpha: false 
-            });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.setClearColor(new THREE.Color(settings.bgColor), 1);
-            container.appendChild(renderer.domElement);
-
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.maxDistance = 300;
-            controls.minDistance = 20;
-
-            window.addEventListener('resize', onWindowResize);
-            
-            // Mouse Interaction Setup
-            window.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('touchmove', onTouchMove, {passive: true});
-
-            generateParticles();
-            animate();
-        }
-
-        // --- 2D Canvas to 3D Particles Logic ---
-        function generateParticles() {
-            // 1. Draw text on hidden canvas
-            const canvas = document.getElementById('hidden-canvas');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            const width = canvas.width;
-            const height = canvas.height;
-
-            ctx.clearRect(0, 0, width, height);
-            
-            // Calculate dynamic font size based on text length to fit canvas
-            let fontSize = 120;
-            if(settings.text.length > 6) {
-                fontSize = Math.max(40, 120 - (settings.text.length - 6) * 10);
-            }
-
-            ctx.font = `bold ${fontSize}px ${settings.font}`;
-            ctx.fillStyle = 'white';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(settings.text, width / 2, height / 2);
-
-            // 2. Extract Pixel Data
-            const imgData = ctx.getImageData(0, 0, width, height).data;
-            const positions = [];
-
-            // 3. Convert solid pixels to 3D coordinates
-            for (let y = 0; y < height; y += settings.density) {
-                for (let x = 0; x < width; x += settings.density) {
-                    const index = (y * width + x) * 4;
-                    const alpha = imgData[index + 3];
-
-                    // If pixel is not fully transparent
-                    if (alpha > 128) {
-                        // Map 2D coordinates to 3D space, centered
-                        const pX = (x - width / 2) * 0.3;
-                        const pY = -(y - height / 2) * 0.3; // Invert Y
-                        
-                        // Add slight random depth for 3D effect
-                        const pZ = (Math.random() - 0.5) * 4;
-
-                        positions.push(pX, pY, pZ);
-                    }
-                }
-            }
-
-            // 4. Update or Create Particle System
-            if (particleSystem) {
-                scene.remove(particleSystem);
-                particleGeometry.dispose();
-                particleMaterial.dispose();
-            }
-
-            if (positions.length === 0) return; // Prevent errors on empty text
-
-            particleGeometry = new THREE.BufferGeometry();
-            
-            // Store original target positions
-            targetPositions = new Float32Array(positions);
-            originalPositions = new Float32Array(positions); // Keeps track of un-repelled state
-            
-            // Initial positions scattered around
-            const startPositions = new Float32Array(positions.length);
-            for(let i=0; i<positions.length; i++) {
-                startPositions[i] = positions[i] + (Math.random() - 0.5) * 200;
-            }
-
-            particleGeometry.setAttribute('position', new THREE.BufferAttribute(startPositions, 3));
-            particleGeometry.setAttribute('target', new THREE.BufferAttribute(targetPositions, 3));
-
-            particleMaterial = new THREE.PointsMaterial({
-                color: new THREE.Color(settings.textColor),
-                size: settings.particleSize,
-                transparent: true,
-                opacity: 0.9,
-                depthWrite: false,
-                blending: THREE.AdditiveBlending,
-                map: settings.shape === 'circle' ? circleTexture : null,
-                alphaTest: 0.1 // Discard fully transparent edge pixels of circle
-            });
-
-            particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-            scene.add(particleSystem);
-        }
-
-        // --- Mouse Repulsion Physics ---
-        const mouse = new THREE.Vector2();
-        const raycaster = new THREE.Raycaster();
-        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-        const planeIntersect = new THREE.Vector3();
-
-        function updateMouseIntersections(clientX, clientY) {
-            mouse.x = (clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
-            
-            raycaster.setFromCamera(mouse, camera);
-            raycaster.ray.intersectPlane(plane, planeIntersect);
-        }
-
-        function onMouseMove(event) {
-            updateMouseIntersections(event.clientX, event.clientY);
-        }
-        function onTouchMove(event) {
-            if(event.touches.length > 0) {
-                updateMouseIntersections(event.touches[0].clientX, event.touches[0].clientY);
-            }
-        }
-
-        function scatter() {
-            if(!particleSystem) return;
-            const positions = particleSystem.geometry.attributes.position.array;
-            for (let i = 0; i < positions.length; i+=3) {
-                positions[i] += (Math.random() - 0.5) * 150;
-                positions[i+1] += (Math.random() - 0.5) * 150;
-                positions[i+2] += (Math.random() - 0.5) * 150;
-            }
-            particleSystem.geometry.attributes.position.needsUpdate = true;
-        }
-
-        // --- UI Event Listeners ---
-        document.getElementById('generate-btn').addEventListener('click', () => {
-            settings.text = textInput.value || " ";
-            settings.font = fontSelect.value;
-            generateParticles();
-        });
-
-        textColorInput.addEventListener('input', (e) => {
-            settings.textColor = e.target.value;
-            if(particleSystem) particleSystem.material.color.set(settings.textColor);
-        });
-
-        bgColorInput.addEventListener('input', (e) => {
-            settings.bgColor = e.target.value;
-            // Update the renderer's clear color immediately
-            renderer.setClearColor(new THREE.Color(settings.bgColor), 1);
-        });
-
-        sizeSlider.addEventListener('input', (e) => {
-            settings.particleSize = parseFloat(e.target.value);
-            document.getElementById('size-val').innerText = settings.particleSize.toFixed(1);
-            if(particleSystem) particleSystem.material.size = settings.particleSize;
-        });
-
-        repelSlider.addEventListener('input', (e) => {
-            settings.repelRadius = parseFloat(e.target.value);
-            document.getElementById('repel-val').innerText = settings.repelRadius;
-        });
-
-        shapeSelect.addEventListener('change', (e) => {
-            settings.shape = e.target.value;
-            if(particleSystem) {
-                particleSystem.material.map = settings.shape === 'circle' ? circleTexture : null;
-                particleSystem.material.needsUpdate = true;
-            }
-        });
-
-        autoRotateToggle.addEventListener('change', (e) => {
-            settings.autoRotate = e.target.checked;
-        });
-
-        document.getElementById('scatter-btn').addEventListener('click', scatter);
-
-        // --- Video Recording Logic (MediaRecorder API) ---
+        // HUD / Watermark Variables
+        let hudScene, hudCamera, watermarkSprite;
+        
+        // Physics Data
+        let originalPositions = [];
+        let mouse = new THREE.Vector2(-9999, -9999);
+        let raycaster = new THREE.Raycaster();
+        let targetPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        let pointOfIntersection = new THREE.Vector3();
+        let time = 0;
+        
+        // Recording state
         let mediaRecorder;
         let recordedChunks = [];
         let isRecording = false;
-        const recordBtn = document.getElementById('record-btn');
-        const recordText = document.getElementById('record-text');
 
-        recordBtn.addEventListener('click', () => {
-            if (!isRecording) {
-                startRecording();
-            } else {
-                stopRecording();
-            }
-        });
+        // UI State Map
+        const State = {
+            text: "suman",
+            font: "Arial",
+            textColor: "#3b82f6",
+            bgColor: "#050508",
+            particleSize: 0.9,
+            repelRadius: 40,
+            shape: "circle",
+            autoRotate: false,
+            density: 5 // Spacing of particles. Higher = spread out grid
+        };
 
-        function startRecording() {
-            recordedChunks = [];
-            // Capture stream at 30 fps
-            const stream = renderer.domElement.captureStream(30);
+        function init() {
+            // Main Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(State.bgColor);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
+            camera.position.set(0, 0, 200);
+
+            // Renderer setup (preserveDrawingBuffer is required for capturing the canvas stream)
+            renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setClearColor(State.bgColor, 1);
             
-            try {
-                // Prefer modern webm codecs
-                let options = { mimeType: 'video/webm; codecs=vp9' };
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    options = { mimeType: 'video/webm; codecs=vp8' };
-                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                        options = { mimeType: 'video/webm' };
-                    }
-                }
-                
-                mediaRecorder = new MediaRecorder(stream, options);
-            } catch (e) {
-                alert("MediaRecorder is not supported in this browser.");
-                return;
-            }
+            // Allow multiple scenes to be rendered on top of each other (HUD)
+            renderer.autoClear = false; 
+            
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    recordedChunks.push(event.data);
-                }
-            };
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
 
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `particle-text-${Date.now()}.webm`;
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-            };
+            // Setup HUD Watermark
+            initHUD();
 
-            mediaRecorder.start();
-            isRecording = true;
-            recordBtn.classList.add('recording');
-            recordText.innerText = "Stop & Save Video";
+            // Generate initial text
+            createTextParticles();
+
+            // Events
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('touchmove', onTouchMove, { passive: true });
+            
+            setupUIBindings();
+            
+            animate();
         }
 
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
+        // --- STREAMING_CHUNK: HUD Watermark Logic ---
+        function initHUD() {
+            hudScene = new THREE.Scene();
+            hudCamera = new THREE.OrthographicCamera(
+                -window.innerWidth / 2, window.innerWidth / 2,
+                window.innerHeight / 2, -window.innerHeight / 2,
+                0, 10
+            );
+            hudCamera.position.z = 5;
+
+            // Create Canvas for Watermark Text
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; // Semi-transparent white
+            ctx.font = '14px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('developed and designed by suman M.', canvas.width - 20, canvas.height - 20);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter; // Ensure crisp text
+            
+            const spriteMaterial = new THREE.SpriteMaterial({ 
+                map: texture, 
+                transparent: true,
+                depthTest: false,
+                depthWrite: false
+            });
+            
+            watermarkSprite = new THREE.Sprite(spriteMaterial);
+            watermarkSprite.scale.set(canvas.width, canvas.height, 1);
+            
+            // Position at bottom right
+            updateWatermarkPosition();
+            
+            hudScene.add(watermarkSprite);
+        }
+
+        function updateWatermarkPosition() {
+            if (watermarkSprite) {
+                // Pin to bottom right corner of the orthographic camera
+                watermarkSprite.position.set(
+                    (window.innerWidth / 2) - (watermarkSprite.scale.x / 2),
+                    -(window.innerHeight / 2) + (watermarkSprite.scale.y / 2),
+                    1
+                );
             }
-            isRecording = false;
-            recordBtn.classList.remove('recording');
-            recordText.innerText = "Start Recording";
+        }
+
+        // --- STREAMING_CHUNK: Precise 2D Pixel to 3D Particle Generator ---
+        function createTextParticles() {
+            if (particles) {
+                scene.remove(particles);
+                geometry.dispose();
+                material.dispose();
+                originalPositions = [];
+            }
+
+            if (!State.text.trim()) return;
+
+            // High res canvas for precise text measuring
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            
+            const fontSize = 120; 
+            const fontWeight = (State.font === 'Arial' || State.font === 'Impact') ? 'bold' : '900';
+            ctx.font = `${fontWeight} ${fontSize}px "${State.font}", sans-serif`;
+            
+            // Dynamic Width calculation to fix squishing
+            const metrics = ctx.measureText(State.text);
+            const textWidth = Math.max(Math.ceil(metrics.width), 10);
+            const textHeight = fontSize * 1.5;
+            
+            // Add padding
+            canvas.width = textWidth + 80; 
+            canvas.height = textHeight;
+
+            // Re-apply font after resize!
+            ctx.font = `${fontWeight} ${fontSize}px "${State.font}", sans-serif`;
+            ctx.fillStyle = 'white';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            ctx.fillText(State.text, canvas.width / 2, canvas.height / 2);
+
+            // Read Pixels
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            const positions = [];
+            const colors = [];
+            const colorObj = new THREE.Color(State.textColor);
+
+            // Center offsets for 3D translation
+            const offsetX = canvas.width / 2;
+            const offsetY = canvas.height / 2;
+
+            // Scan grid
+            for (let y = 0; y < canvas.height; y += State.density) {
+                for (let x = 0; x < canvas.width; x += State.density) {
+                    const index = (x + y * canvas.width) * 4;
+                    const alpha = imgData[index + 3]; // get opacity
+                    
+                    if (alpha > 128) {
+                        // Map to 3D space, shrinking scale to fit scene
+                        const pX = (x - offsetX) * 0.4;
+                        const pY = -(y - offsetY) * 0.4;
+                        const pZ = (Math.random() - 0.5) * 1.5; // Tiny Z variation for thickness
+
+                        positions.push(pX, pY, pZ);
+                        originalPositions.push(new THREE.Vector3(pX, pY, pZ));
+                        colors.push(colorObj.r, colorObj.g, colorObj.b);
+                    }
+                }
+            }
+
+            if (positions.length === 0) return;
+
+            // Build Buffer Geometry
+            geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.setAttribute('basePosition', new THREE.Float32BufferAttribute(positions, 3));
+
+            // Material
+            material = new THREE.PointsMaterial({
+                size: State.particleSize,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.85,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            // Make particles circular if selected
+            if (State.shape === 'circle') {
+                material.onBeforeCompile = (shader) => {
+                    shader.fragmentShader = shader.fragmentShader.replace(
+                        `gl_FragColor = vec4( diffuseColor.rgb * vColor, diffuseColor.a );`,
+                        `
+                        vec2 xy = gl_PointCoord.xy - vec2(0.5);
+                        float ll = length(xy);
+                        if(ll > 0.5) discard;
+                        gl_FragColor = vec4( diffuseColor.rgb * vColor, diffuseColor.a * smoothstep(0.5, 0.4, ll) );
+                        `
+                    );
+                };
+            }
+
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+
+            // Auto-Fit Camera
+            const actualTextWidth = canvas.width * 0.4;
+            const fov = camera.fov * (Math.PI / 180);
+            let targetZ = Math.abs((actualTextWidth / 2) / Math.tan(fov / 2)) * 1.2;
+            
+            // Clamping zoom limits
+            targetZ = Math.max(targetZ, 50); 
+            targetZ = Math.min(targetZ, 350);
+            
+            camera.position.set(0, 0, targetZ);
+            controls.target.set(0, 0, 0);
+        }
+
+        // --- STREAMING_CHUNK: Mouse Interactions & Particle Physics ---
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onTouchMove(event) {
+            if (event.touches.length > 0) {
+                mouse.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+            }
+        }
+
+        function updatePhysics() {
+            if (!particles || !geometry) return;
+            
+            time += 0.05;
+
+            // Find mouse in 3D world (Z=0 plane)
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.ray.intersectPlane(targetPlane, pointOfIntersection);
+
+            const positions = geometry.attributes.position.array;
+            const basePositions = geometry.attributes.basePosition.array;
+            let isHovering = mouse.x !== -9999 && mouse.y !== -9999;
+            
+            for (let i = 0; i < originalPositions.length; i++) {
+                const idx = i * 3;
+                
+                let px = positions[idx];
+                let py = positions[idx + 1];
+                let pz = positions[idx + 2];
+
+                const bx = basePositions[idx];
+                const by = basePositions[idx + 1];
+                const bz = basePositions[idx + 2];
+
+                // Mouse Repel Logic
+                let dx = isHovering ? pointOfIntersection.x - px : 1000;
+                let dy = isHovering ? pointOfIntersection.y - py : 1000;
+                let distSq = dx * dx + dy * dy;
+                const radiusSq = State.repelRadius * State.repelRadius;
+
+                if (distSq < radiusSq) {
+                    const dist = Math.sqrt(distSq);
+                    // Stronger repel closer to center
+                    const force = (State.repelRadius - dist) / State.repelRadius; 
+                    const angle = Math.atan2(dy, dx);
+                    
+                    px -= Math.cos(angle) * force * 1.5;
+                    py -= Math.sin(angle) * force * 1.5;
+                    pz += (Math.random() - 0.5) * force * 3;
+                } else {
+                    // Smooth return to base position (lerp)
+                    px += (bx - px) * 0.15;
+                    py += (by - py) * 0.15;
+                    pz += (bz - pz) * 0.15;
+                }
+
+                // Sine wave breathing effect
+                pz += Math.sin(time + bx * 0.05) * 0.02;
+
+                positions[idx] = px;
+                positions[idx + 1] = py;
+                positions[idx + 2] = pz;
+            }
+
+            geometry.attributes.position.needsUpdate = true;
+        }
+
+        // --- STREAMING_CHUNK: Video Recording Pipeline ---
+        function handleRecording() {
+            const btn = document.getElementById('btn-record');
+            const text = document.getElementById('record-text');
+            const indicator = btn.querySelector('div');
+
+            if (isRecording) {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                text.innerText = "Start Recording";
+                btn.classList.remove('bg-red-600', 'hover:bg-red-500');
+                btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+                indicator.classList.remove('animate-pulse', 'bg-red-200');
+                indicator.classList.add('bg-white');
+                
+            } else {
+                // Start Recording
+                const stream = renderer.domElement.captureStream(60); // 60 FPS
+                recordedChunks = [];
+                
+                let options = { mimeType: 'video/webm; codecs=vp9' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = { mimeType: 'video/webm' };
+                }
+
+                mediaRecorder = new MediaRecorder(stream, options);
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `Particle_Text_${Date.now()}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                text.innerText = "Stop Recording";
+                btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+                btn.classList.add('bg-red-600', 'hover:bg-red-500');
+                indicator.classList.remove('bg-white');
+                indicator.classList.add('animate-pulse', 'bg-red-200');
+            }
+        }
+
+        // --- STREAMING_CHUNK: UI Binding & Event Listeners ---
+        function setupUIBindings() {
+            // Reusable update color helper
+            const updateColors = () => {
+                if (!particles) return;
+                const colorObj = new THREE.Color(State.textColor);
+                const colors = geometry.attributes.color.array;
+                for (let i = 0; i < colors.length; i += 3) {
+                    colors[i] = colorObj.r;
+                    colors[i+1] = colorObj.g;
+                    colors[i+2] = colorObj.b;
+                }
+                geometry.attributes.color.needsUpdate = true;
+            };
+
+            // Inputs
+            document.getElementById('text-input').addEventListener('input', (e) => {
+                State.text = e.target.value;
+                // Live typing updates
+                createTextParticles(); 
+            });
+
+            document.getElementById('font-select').addEventListener('change', (e) => {
+                State.font = e.target.value;
+                createTextParticles();
+            });
+
+            document.getElementById('text-color').addEventListener('input', (e) => {
+                State.textColor = e.target.value;
+                document.getElementById('hex-text').innerText = e.target.value;
+                updateColors();
+            });
+
+            document.getElementById('bg-color').addEventListener('input', (e) => {
+                State.bgColor = e.target.value;
+                document.getElementById('hex-bg').innerText = e.target.value;
+                scene.background.set(State.bgColor);
+                renderer.setClearColor(State.bgColor, 1);
+            });
+
+            document.getElementById('size-slider').addEventListener('input', (e) => {
+                State.particleSize = parseFloat(e.target.value);
+                document.getElementById('val-size').innerText = State.particleSize.toFixed(1);
+                if (material) material.size = State.particleSize;
+            });
+
+            document.getElementById('radius-slider').addEventListener('input', (e) => {
+                State.repelRadius = parseInt(e.target.value);
+                document.getElementById('val-radius').innerText = State.repelRadius;
+            });
+            
+            document.getElementById('shape-select').addEventListener('change', (e) => {
+                State.shape = e.target.value;
+                createTextParticles(); // Rebuild material shader
+            });
+
+            document.getElementById('auto-rotate').addEventListener('change', (e) => {
+                State.autoRotate = e.target.checked;
+            });
+
+            // Buttons
+            document.getElementById('btn-generate').addEventListener('click', createTextParticles);
+            
+            document.getElementById('btn-scatter').addEventListener('click', () => {
+                if (!particles) return;
+                const positions = geometry.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    positions[i] += (Math.random() - 0.5) * 100;
+                    positions[i+1] += (Math.random() - 0.5) * 100;
+                    positions[i+2] += (Math.random() - 0.5) * 100;
+                }
+                geometry.attributes.position.needsUpdate = true;
+            });
+
+            document.getElementById('btn-record').addEventListener('click', handleRecording);
+
+            // Toggle Hide/Show UI
+            const toggleBtn = document.getElementById('toggle-ui');
+            const toggleIcon = document.getElementById('toggle-icon');
+            const panel = document.getElementById('ui-panel');
+            let isPanelVisible = true;
+
+            toggleBtn.addEventListener('click', () => {
+                isPanelVisible = !isPanelVisible;
+                
+                if (isPanelVisible) {
+                    panel.classList.remove('hidden-state');
+                    toggleIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>`;
+                    toggleIcon.classList.remove('rotate-180');
+                } else {
+                    panel.classList.add('hidden-state');
+                    toggleIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>`;
+                    toggleIcon.classList.add('rotate-180');
+                }
+            });
+
+            // Mouse leave cleanup
+            document.body.addEventListener('mouseleave', () => mouse.set(-9999, -9999));
+            document.body.addEventListener('touchend', () => mouse.set(-9999, -9999));
         }
 
         function onWindowResize() {
+            // Main Camera Update
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
+            
+            // HUD Camera Update
+            hudCamera.left = -window.innerWidth / 2;
+            hudCamera.right = window.innerWidth / 2;
+            hudCamera.top = window.innerHeight / 2;
+            hudCamera.bottom = -window.innerHeight / 2;
+            hudCamera.updateProjectionMatrix();
+            
+            updateWatermarkPosition();
+            
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // --- Animation Loop ---
+        // --- STREAMING_CHUNK: Render Loop & Multi-Scene Compositing ---
         function animate() {
             requestAnimationFrame(animate);
-            const time = clock.getElapsedTime();
-
-            if (particleSystem) {
-                const positions = particleSystem.geometry.attributes.position.array;
-                
-                for (let i = 0; i < positions.length; i += 3) {
-                    // Base target position from text formation
-                    let targetX = originalPositions[i];
-                    let targetY = originalPositions[i+1];
-                    let targetZ = originalPositions[i+2];
-
-                    // Apply Repulsion
-                    if (settings.repelRadius > 0) {
-                        const dx = positions[i] - planeIntersect.x;
-                        const dy = positions[i+1] - planeIntersect.y;
-                        const distSq = dx*dx + dy*dy;
-                        const repelSq = settings.repelRadius * settings.repelRadius;
-
-                        if (distSq < repelSq) {
-                            const force = (repelSq - distSq) / repelSq; // 0 to 1
-                            targetX += dx * force;
-                            targetY += dy * force;
-                            targetZ += 20 * force; // Push forward slightly
-                        }
-                    }
-
-                    // Add slight sine wave float for life-like movement
-                    targetY += Math.sin(time * 2 + i) * 0.2;
-
-                    // Lerp towards target
-                    positions[i] += (targetX - positions[i]) * 0.1;
-                    positions[i+1] += (targetY - positions[i+1]) * 0.1;
-                    positions[i+2] += (targetZ - positions[i+2]) * 0.1;
-                }
-                
-                particleSystem.geometry.attributes.position.needsUpdate = true;
-                
-                if (settings.autoRotate) {
-                    // Rotate the whole container slightly
-                    particleSystem.rotation.y = Math.sin(time * 0.5) * 0.2;
-                    particleSystem.rotation.x = Math.sin(time * 0.3) * 0.1;
-                } else {
-                    // Reset rotation gracefully
-                    particleSystem.rotation.y += (0 - particleSystem.rotation.y) * 0.05;
-                    particleSystem.rotation.x += (0 - particleSystem.rotation.x) * 0.05;
-                }
+            
+            if (State.autoRotate) {
+                scene.rotation.y += 0.005;
+            } else {
+                // Ease back to center if turned off
+                scene.rotation.y += (0 - scene.rotation.y) * 0.05;
             }
 
             controls.update();
+            updatePhysics();
+            
+            // 1. Clear color & depth
+            renderer.clear();
+            
+            // 2. Render Main 3D Particles
             renderer.render(scene, camera);
+            
+            // 3. Clear DEPTH so the HUD renders ON TOP of everything
+            renderer.clearDepth();
+            
+            // 4. Render the Watermark HUD (Will be captured by MediaRecorder)
+            renderer.render(hudScene, hudCamera);
         }
 
-        // Start everything
         init();
     </script>
 </body>
