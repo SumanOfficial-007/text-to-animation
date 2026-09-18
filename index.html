@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Particle Text Studio</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        gray: {
+                            850: '#1a1a24',
+                            900: '#0f0f15',
+                        }
+                    },
+                    transitionProperty: {
+                        'panel': 'transform, opacity, visibility',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000; /* Fallback */
+            color: white;
+            touch-action: none;
+        }
+        
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: rgba(20, 20, 30, 0.65);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 2px;
+        }
+
+        /* Panel Transitions */
+        #ui-panel {
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease;
+        }
+        
+        /* Desktop Hide State */
+        @media (min-width: 768px) {
+            #ui-panel.panel-hidden {
+                transform: translateX(-120%);
+                opacity: 0;
+                pointer-events: none;
+            }
+        }
+        
+        /* Mobile Hide State */
+        @media (max-width: 767px) {
+            #ui-panel.panel-hidden {
+                transform: translateY(120%);
+                opacity: 0;
+                pointer-events: none;
+            }
+        }
+
+        /* Color Picker Reset */
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 4px;
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- Toggle Button (Always visible) -->
+    <button id="toggle-ui-btn" class="fixed top-6 left-6 z-30 w-12 h-12 glass-panel rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors shadow-lg">
+        <svg id="toggle-icon" class="w-6 h-6 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <!-- X Icon by default -->
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+    </button>
+
+    <!-- Main Control Panel -->
+    <div id="ui-panel" class="fixed bottom-4 left-4 right-4 md:bottom-auto md:top-24 md:left-6 md:right-auto md:w-[360px] glass-panel rounded-2xl z-20 flex flex-col">
+        
+        <div class="px-6 py-5 border-b border-white/5">
+            <h1 class="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></span>
+                Pro Text Studio
+            </h1>
+        </div>
+
+        <div class="p-6 space-y-6 overflow-y-auto max-h-[60vh] md:max-h-[calc(100vh-12rem)]">
+            
+            <!-- Text Input -->
+            <div class="space-y-2">
+                <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">Display Text</label>
+                <input type="text" id="text-input" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" value="Basava Brigade">
+            </div>
+
+            <!-- Color Controls -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">Text Color</label>
+                    <div class="flex items-center gap-3 bg-black/40 p-2 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
+                        <input type="color" id="text-color" value="#3b82f6" class="w-8 h-8 rounded cursor-pointer bg-transparent">
+                        <span id="hex-text" class="text-xs font-mono text-gray-300">#3b82f6</span>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">Background</label>
+                    <div class="flex items-center gap-3 bg-black/40 p-2 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
+                        <input type="color" id="bg-color" value="#0a0a0f" class="w-8 h-8 rounded cursor-pointer bg-transparent">
+                        <span id="hex-bg" class="text-xs font-mono text-gray-300">#0a0a0f</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sliders -->
+            <div class="space-y-5">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">Particle Size</label>
+                        <span id="val-size" class="text-xs text-blue-400 font-mono">1.5</span>
+                    </div>
+                    <input type="range" id="size-slider" min="0.5" max="4.0" step="0.1" value="1.5">
+                </div>
+                
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">Repel Radius</label>
+                        <span id="val-radius" class="text-xs text-blue-400 font-mono">25</span>
+                    </div>
+                    <input type="range" id="radius-slider" min="5" max="50" step="1" value="25">
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="pt-2">
+                <button id="btn-record" class="w-full py-3.5 px-4 bg-white hover:bg-gray-100 text-black rounded-xl font-bold transition-all flex items-center justify-center gap-2 group">
+                    <div class="w-3 h-3 bg-red-500 rounded-full group-hover:scale-110 transition-transform shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+                    <span id="record-text">Start Recording</span>
+                </button>
+            </div>
+            
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Core variables
+        let scene, camera, renderer, controls;
+        let particles, geometry, material;
+        let originalPositions = [];
+        let mouse = new THREE.Vector2(-9999, -9999);
+        let raycaster = new THREE.Raycaster();
+        let targetPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        let pointOfIntersection = new THREE.Vector3();
+        
+        // Recording state
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        // State defaults
+        const State = {
+            text: "Basava Brigade",
+            textColor: "#3b82f6",
+            bgColor: "#0a0a0f",
+            particleSize: 1.5,
+            repelRadius: 25,
+            density: 4 // smaller = more particles
+        };
+
+        function init() {
+            // Setup Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(State.bgColor);
+
+            // Setup Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
+            camera.position.set(0, 0, 150);
+
+            // Setup Renderer
+            // CRITICAL: preserveDrawingBuffer ensures MediaRecorder captures properly
+            renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setClearColor(State.bgColor, 1);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Setup Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Generate initial text
+            createTextParticles();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('touchmove', onTouchMove, { passive: true });
+            
+            setupUIBindings();
+            
+            animate();
+        }
+
+        // --- STREAMING_CHUNK: 2D Canvas Pixel Mapping Logic ---
+        function createTextParticles() {
+            // Cleanup old particles
+            if (particles) {
+                scene.remove(particles);
+                geometry.dispose();
+                material.dispose();
+                originalPositions = [];
+            }
+
+            if (!State.text.trim()) return;
+
+            // 1. Create hidden 2D Canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            
+            // 2. Measure text to dynamically size canvas (Fixes squishing issue)
+            const fontSize = 80; // High resolution font size for crispness
+            ctx.font = `900 ${fontSize}px "Inter", sans-serif`;
+            const metrics = ctx.measureText(State.text);
+            
+            // Calculate exact width needed + some padding
+            const textWidth = Math.ceil(metrics.width);
+            const textHeight = fontSize * 1.2;
+            
+            canvas.width = textWidth + 40; 
+            canvas.height = textHeight + 40;
+
+            // 3. Draw Text on Canvas
+            // Reset font after resizing canvas!
+            ctx.font = `900 ${fontSize}px "Inter", sans-serif`;
+            ctx.fillStyle = 'white';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            ctx.fillText(State.text, canvas.width / 2, canvas.height / 2);
+
+            // 4. Extract Pixels
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            const positions = [];
+            const colors = [];
+            
+            const colorObj = new THREE.Color(State.textColor);
+
+            // Center offsets
+            const offsetX = canvas.width / 2;
+            const offsetY = canvas.height / 2;
+
+            for (let y = 0; y < canvas.height; y += State.density) {
+                for (let x = 0; x < canvas.width; x += State.density) {
+                    const index = (x + y * canvas.width) * 4;
+                    const alpha = imgData[index + 3];
+                    
+                    // If pixel is not transparent, create a particle
+                    if (alpha > 128) {
+                        // Map 2D to 3D centered space
+                        const pX = (x - offsetX) * 0.5;
+                        const pY = -(y - offsetY) * 0.5; // Invert Y for 3D coordinates
+                        const pZ = (Math.random() - 0.5) * 2; // Slight depth variation
+
+                        positions.push(pX, pY, pZ);
+                        
+                        // Store original for physics
+                        originalPositions.push(new THREE.Vector3(pX, pY, pZ));
+                        
+                        // Add Color
+                        colors.push(colorObj.r, colorObj.g, colorObj.b);
+                    }
+                }
+            }
+
+            if (positions.length === 0) return;
+
+            // 5. Build 3D Particle System
+            geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            
+            // Dynamic geometry base attribute for animation reference
+            geometry.setAttribute('basePosition', new THREE.Float32BufferAttribute(positions, 3));
+
+            // Custom Circular Particle Shader
+            material = new THREE.PointsMaterial({
+                size: State.particleSize,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            // Make it circular instead of square
+            material.onBeforeCompile = (shader) => {
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    `gl_FragColor = vec4( diffuseColor.rgb * vColor, diffuseColor.a );`,
+                    `
+                    vec2 xy = gl_PointCoord.xy - vec2(0.5);
+                    float ll = length(xy);
+                    if(ll > 0.5) discard;
+                    gl_FragColor = vec4( diffuseColor.rgb * vColor, diffuseColor.a * (1.0 - ll*2.0) );
+                    `
+                );
+            };
+
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+
+            // 6. Camera Auto-Fit
+            // Calculate width based on particle spread to zoom appropriately
+            const actualTextWidth = canvas.width * 0.5; // Scaled down by 0.5 as per pX calculation
+            const fov = camera.fov * (Math.PI / 180);
+            let targetZ = Math.abs((actualTextWidth / 2) / Math.tan(fov / 2)) * 1.2;
+            
+            // Enforce limits so it doesn't get awkwardly close or far
+            targetZ = Math.max(targetZ, 60); 
+            targetZ = Math.min(targetZ, 300);
+            
+            camera.position.z = targetZ;
+            controls.target.set(0, 0, 0);
+        }
+
+        // --- STREAMING_CHUNK: Mouse Interaction & Physics ---
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onTouchMove(event) {
+            if (event.touches.length > 0) {
+                mouse.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+            }
+        }
+
+        function updatePhysics() {
+            if (!particles || !geometry) return;
+
+            // Find mouse intersection on Z=0 plane
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.ray.intersectPlane(targetPlane, pointOfIntersection);
+
+            const positions = geometry.attributes.position.array;
+            const basePositions = geometry.attributes.basePosition.array;
+
+            // Reset mouse vector if offscreen to stop repelling from origin
+            let isHovering = mouse.x !== -9999 && mouse.y !== -9999;
+            
+            for (let i = 0; i < originalPositions.length; i++) {
+                const idx = i * 3;
+                
+                let px = positions[idx];
+                let py = positions[idx + 1];
+                let pz = positions[idx + 2];
+
+                const bx = basePositions[idx];
+                const by = basePositions[idx + 1];
+                const bz = basePositions[idx + 2];
+
+                // Calculate distance from mouse to base position
+                let dx = isHovering ? pointOfIntersection.x - px : 1000;
+                let dy = isHovering ? pointOfIntersection.y - py : 1000;
+                let distSq = dx * dx + dy * dy;
+
+                const radiusSq = State.repelRadius * State.repelRadius;
+
+                if (distSq < radiusSq) {
+                    // Repel away from mouse
+                    const dist = Math.sqrt(distSq);
+                    const force = (State.repelRadius - dist) / State.repelRadius;
+                    
+                    const angle = Math.atan2(dy, dx);
+                    
+                    // Push particle
+                    px -= Math.cos(angle) * force * 2;
+                    py -= Math.sin(angle) * force * 2;
+                    pz += (Math.random() - 0.5) * force * 5; // pop out a bit
+                } else {
+                    // Return to base position (lerp)
+                    px += (bx - px) * 0.1;
+                    py += (by - py) * 0.1;
+                    pz += (bz - pz) * 0.1;
+                }
+
+                // Add slight floating noise
+                px += Math.sin(Date.now() * 0.001 + i) * 0.01;
+
+                positions[idx] = px;
+                positions[idx + 1] = py;
+                positions[idx + 2] = pz;
+            }
+
+            geometry.attributes.position.needsUpdate = true;
+        }
+
+        // --- STREAMING_CHUNK: Video Recording ---
+        function handleRecording() {
+            const btn = document.getElementById('btn-record');
+            const text = document.getElementById('record-text');
+            const indicator = btn.querySelector('div');
+
+            if (isRecording) {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                text.innerText = "Start Recording";
+                btn.classList.remove('bg-gray-200');
+                indicator.classList.remove('animate-pulse');
+                
+            } else {
+                // Start Recording
+                const stream = renderer.domElement.captureStream(60);
+                recordedChunks = [];
+                
+                let options = { mimeType: 'video/webm; codecs=vp9' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = { mimeType: 'video/webm' };
+                }
+
+                mediaRecorder = new MediaRecorder(stream, options);
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `Particle_Text_${Date.now()}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                text.innerText = "Stop Recording...";
+                btn.classList.add('bg-gray-200');
+                indicator.classList.add('animate-pulse');
+            }
+        }
+
+        // --- STREAMING_CHUNK: Event Listeners & UI ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function setupUIBindings() {
+            // Text Input
+            let textTimeout;
+            document.getElementById('text-input').addEventListener('input', (e) => {
+                clearTimeout(textTimeout);
+                textTimeout = setTimeout(() => {
+                    State.text = e.target.value;
+                    createTextParticles();
+                }, 300);
+            });
+
+            // Color inputs
+            document.getElementById('text-color').addEventListener('input', (e) => {
+                State.textColor = e.target.value;
+                document.getElementById('hex-text').innerText = e.target.value;
+                if (particles) {
+                    const colorObj = new THREE.Color(State.textColor);
+                    const colors = geometry.attributes.color.array;
+                    for (let i = 0; i < colors.length; i += 3) {
+                        colors[i] = colorObj.r;
+                        colors[i+1] = colorObj.g;
+                        colors[i+2] = colorObj.b;
+                    }
+                    geometry.attributes.color.needsUpdate = true;
+                }
+            });
+
+            document.getElementById('bg-color').addEventListener('input', (e) => {
+                State.bgColor = e.target.value;
+                document.getElementById('hex-bg').innerText = e.target.value;
+                scene.background.set(State.bgColor);
+                renderer.setClearColor(State.bgColor, 1);
+            });
+
+            // Sliders
+            document.getElementById('size-slider').addEventListener('input', (e) => {
+                State.particleSize = parseFloat(e.target.value);
+                document.getElementById('val-size').innerText = State.particleSize.toFixed(1);
+                if (material) material.size = State.particleSize;
+            });
+
+            document.getElementById('radius-slider').addEventListener('input', (e) => {
+                State.repelRadius = parseInt(e.target.value);
+                document.getElementById('val-radius').innerText = State.repelRadius;
+            });
+
+            // Record Button
+            document.getElementById('btn-record').addEventListener('click', handleRecording);
+
+            // Hide/Show UI Toggle
+            const toggleBtn = document.getElementById('toggle-ui-btn');
+            const toggleIcon = document.getElementById('toggle-icon');
+            const panel = document.getElementById('ui-panel');
+            let isPanelVisible = true;
+
+            toggleBtn.addEventListener('click', () => {
+                isPanelVisible = !isPanelVisible;
+                
+                if (isPanelVisible) {
+                    panel.classList.remove('panel-hidden');
+                    // Change to X icon
+                    toggleIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>`;
+                    toggleIcon.classList.remove('rotate-180');
+                } else {
+                    panel.classList.add('panel-hidden');
+                    // Change to Hamburger/Settings icon
+                    toggleIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>`;
+                    toggleIcon.classList.add('rotate-180');
+                }
+            });
+            
+            // Clear mouse on leave
+            document.body.addEventListener('mouseleave', () => {
+                mouse.set(-9999, -9999);
+            });
+        }
+
+        // --- STREAMING_CHUNK: Main Render Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            updatePhysics();
+            renderer.render(scene, camera);
+        }
+
+        // Boot
+        init();
+    </script>
+</body>
+</html>
